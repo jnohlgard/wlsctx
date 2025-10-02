@@ -1,0 +1,20 @@
+[package]
+name = "wlsctx"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.48", features = ["derive"] }
+env_logger = { version = "0.11.8", optional = true }
+log = "0.4.28"
+pretty_env_logger = { version = "0.5.0" }
+sd-notify = "0.4.5"
+wayland-backend = "0.3.11"
+wayland-client = "0.31.11"
+wayland-protocols = { version = "0.32.9", features = ["client", "staging"] }
+wayland-scanner = "0.31.7"
+xdg = "3.0.0"
+
+[features]
+pretty_env_logger = []
+env_logger = ["dep:env_logger"]
