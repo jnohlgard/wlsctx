@@ -1,31 +1,26 @@
-use log::{debug, error, info, warn, };
+use log::{debug, error, info, warn};
 
+use sd_notify;
+use std::fs;
+use std::io;
+use std::os::fd::{AsFd, FromRawFd, OwnedFd};
+use std::os::unix::{fs::FileTypeExt, net::UnixListener};
+use std::path;
 use wayland_client::{
-    delegate_noop,
+    Connection, QueueHandle, delegate_noop,
+    globals::{GlobalListContents, registry_queue_init},
     protocol::wl_registry,
-    Connection, QueueHandle,
-    globals::{registry_queue_init, GlobalListContents},
 };
 use wayland_protocols::wp::security_context::v1::client::{
-    wp_security_context_manager_v1,
-    wp_security_context_v1,
+    wp_security_context_manager_v1, wp_security_context_v1,
 };
 use xdg;
-use std::os::unix::{
-    fs::FileTypeExt,
-    net::UnixListener,
-};
-use std::os::fd::{ AsFd, FromRawFd, OwnedFd, };
-use std::io;
-use std::fs;
-use std::path;
-use sd_notify;
 
 use env_logger::Env;
 
 use clap::Parser;
+use signal::Signal::{SIGHUP, SIGINT, SIGTERM};
 use signal::trap::Trap;
-use signal::Signal::{SIGHUP, SIGTERM, SIGINT};
 
 /// Set up a Wayland socket with an attached security context
 ///
@@ -84,7 +79,7 @@ fn main() {
                 // only user of this fd
                 info!("Received socket activation environment from parent {raw_fd:#?}");
                 unsafe { UnixListener::from_raw_fd(raw_fd) }
-            },
+            }
             _ => {
                 panic!("Failed to get socket FD from activation environment")
             }
@@ -92,26 +87,27 @@ fn main() {
         (false, Some(socket_path)) => {
             let socket_abspath = match socket_path.is_absolute() {
                 true => socket_path,
-                false => xdg::BaseDirectories::new().place_runtime_file(socket_path).unwrap(),
+                false => xdg::BaseDirectories::new()
+                    .place_runtime_file(socket_path)
+                    .unwrap(),
             };
-            let _ = match fs::metadata(&socket_abspath) { 
+            let _ = match fs::metadata(&socket_abspath) {
                 Ok(meta) => {
                     if meta.file_type().is_socket() {
                         info!("Removing old socket {socket_abspath:?}");
                         let _ = fs::remove_file(&socket_abspath)
                             .inspect_err(|e| error!("Failed to remove existing socket: {e}"));
-                    }
-                    else {
+                    } else {
                         error!("Path already exists and is not a socket {socket_abspath:?}");
                     }
-                },
+                }
                 _ => (),
             };
             UnixListener::bind(socket_abspath).expect("Failed to bind to Unix socket")
-        },
+        }
         _ => {
             panic!("No listening socket provided")
-        },
+        }
     };
     let _ = match listener.local_addr() {
         Ok(local_addr) => info!("Listening on {local_addr:?}"),
@@ -124,9 +120,11 @@ fn main() {
         let conn = Connection::connect_to_env().expect("upstream Wayland connection failed");
         let (globals, mut event_queue) = registry_queue_init::<State>(&conn).unwrap();
         let qh = &event_queue.handle();
-        let security_context_manager: wp_security_context_manager_v1::WpSecurityContextManagerV1 = globals.bind(qh, 1..=1, ()).unwrap();
+        let security_context_manager: wp_security_context_manager_v1::WpSecurityContextManagerV1 =
+            globals.bind(qh, 1..=1, ()).unwrap();
         let (reader, writer) = io::pipe().unwrap();
-        let security_context = security_context_manager.create_listener(listener.as_fd(), reader.as_fd(), qh, ());
+        let security_context =
+            security_context_manager.create_listener(listener.as_fd(), reader.as_fd(), qh, ());
         security_context_manager.destroy();
         let sandbox_engine = &cli.sandbox_engine;
         let app_id = &cli.app_id;
@@ -137,7 +135,7 @@ fn main() {
         security_context.set_instance_id(instance_id.clone());
         security_context.commit();
         security_context.destroy();
-        event_queue.roundtrip(&mut State{}).unwrap();
+        event_queue.roundtrip(&mut State {}).unwrap();
         writer.into()
     };
     let trap = Trap::trap(&[SIGTERM, SIGINT, SIGHUP]);
@@ -148,18 +146,18 @@ fn main() {
             SIGINT => {
                 println!("Caught CTRL+C, stopping...");
                 break;
-            },
+            }
             SIGTERM => {
                 debug!("Stopping");
                 break;
-            },
+            }
             SIGHUP => {
                 warn!("TODO: SIGHUP restart");
                 break;
-            },
+            }
             sig => {
                 warn!("Unexpected signal {sig:#?}");
-            },
+            }
         }
     }
     info!("Shutting down...");
