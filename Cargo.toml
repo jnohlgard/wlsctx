@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.5.48", features = ["derive", "env"] }
 env_logger = "0.11.8"
 log = "0.4.28"
+nix = { version = "0.30.1", features = ["signal", "process"] }
 sd-notify = "0.4.5"
 signal = "0.7.0"
 wayland-backend = "0.3.11"
