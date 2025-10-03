@@ -15,12 +15,14 @@ use wayland_protocols::wp::security_context::v1::client::{
     wp_security_context_manager_v1, wp_security_context_v1,
 };
 use xdg;
-
+use nix::sys::{
+    wait::{waitpid, WaitPidFlag},
+    signalfd::{SignalFd, SigSet, SfdFlags},
+    signal::Signal,
+    signal::Signal::*,
+};
 use env_logger::Env;
-
 use clap::Parser;
-use signal::Signal::{SIGHUP, SIGINT, SIGTERM};
-use signal::trap::Trap;
 
 /// Set up a Wayland socket with an attached security context
 ///
@@ -28,19 +30,22 @@ use signal::trap::Trap;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about)]
 struct Cli {
-    #[arg(long)]
+    #[arg(long, env = "WLSCTX_APP_ID")]
     app_id: String,
-    #[arg(long)]
     /// Instance ID
+    #[arg(long, env = "WLSCTX_INSTANCE_ID")]
     instance_id: String,
     /// Sandbox engine ID
-    #[arg(long)]
+    #[arg(long, env = "WLSCTX_SANDBOX_ENGINE")]
     sandbox_engine: String,
+    /// Derive app_id and instance_id from systemd unit name (app-id@instance.service)
+    #[arg(long, env)]
+    systemd_unit: Option<String>,
     /// Receive socket via systemd socket activation (LISTEN_FDS)
-    #[arg(long, group = "socket")]
+    #[arg(long, group = "socket", env = "LISTEN_FDS")]
     socket_activation: bool,
     /// Listen on Unix socket
-    #[arg(long, group = "socket")]
+    #[arg(long, group = "socket", env = "WLSCTX_SOCKET_PATH")]
     listen: Option<path::PathBuf>,
 }
 
@@ -64,7 +69,6 @@ impl wayland_client::Dispatch<wl_registry::WlRegistry, GlobalListContents> for S
 // The security context protocol has no events that we need to manage
 delegate_noop!(State: wp_security_context_manager_v1::WpSecurityContextManagerV1);
 delegate_noop!(State: wp_security_context_v1::WpSecurityContextV1);
-delegate_noop!(State: ignore wl_registry::WlRegistry);
 
 // The main function of our program
 fn main() {
@@ -138,22 +142,33 @@ fn main() {
         event_queue.roundtrip(&mut State {}).unwrap();
         writer.into()
     };
-    let trap = Trap::trap(&[SIGTERM, SIGINT, SIGHUP]);
     info!("Holding close_fd open to keep the tagged wayland socket available {close_fd:?}");
-    for sig in trap {
-        debug!("Signal: {sig:#?}");
-        match sig {
-            SIGINT => {
-                println!("Caught CTRL+C, stopping...");
-                break;
-            }
-            SIGTERM => {
+    let _ = sd_notify::notify(true, &[sd_notify::NotifyState::Ready]);
+    let mut mask = SigSet::all();
+    for sig in (SIGFPE | SIGILL | SIGSEGV | SIGBUS | SIGABRT | SIGTRAP | SIGSYS).iter() {
+        mask.remove(sig);
+    }
+    mask.thread_block().unwrap();
+    let sigfd = SignalFd::with_flags(&mask, SfdFlags::SFD_CLOEXEC).unwrap();
+    while let Some(siginfo) = sigfd.read_signal().unwrap() {
+        debug!("Signal: {siginfo:?}");
+        match Signal::try_from(siginfo.ssi_signo as i32).unwrap() {
+            SIGTERM | SIGINT => {
                 debug!("Stopping");
                 break;
             }
             SIGHUP => {
                 warn!("TODO: SIGHUP restart");
                 break;
+            }
+            SIGCHLD => {
+                debug!("reap zombies");
+                while let Ok(status) = waitpid(None, Some(WaitPidFlag::WNOHANG)) {
+                    debug!("status: {status:?}");
+                }
+            }
+            SIGTSTP | SIGTTOU | SIGTTIN => {
+                debug!("ignoring kernel attempting to stop us: tty has TOSTOP set");
             }
             sig => {
                 warn!("Unexpected signal {sig:#?}");
