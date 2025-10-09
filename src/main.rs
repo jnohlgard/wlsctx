@@ -1,8 +1,9 @@
-use log::{debug, error, info, warn};
+use log::{debug, error, info, log_enabled, warn, Level};
 
 use sd_notify;
 use std::fs;
 use std::io;
+use std::ops::Not;
 use std::os::fd::{AsFd, FromRawFd, OwnedFd};
 use std::os::unix::{fs::FileTypeExt, net::UnixListener};
 use std::path;
@@ -30,23 +31,21 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about)]
 struct Cli {
-    #[arg(long, env = "WLSCTX_APP_ID")]
-    app_id: String,
-    /// Instance ID
-    #[arg(long, env = "WLSCTX_INSTANCE_ID")]
-    instance_id: String,
-    /// Sandbox engine ID
+    /// Application ID in security context
+    #[arg(long, env = "WLSCTX_APP_ID", required_unless_present = "socket_activation")]
+    app_id: Option<String>,
+    /// Instance ID in security context
+    #[arg(long, env = "WLSCTX_INSTANCE_ID", required_unless_present = "socket_activation")]
+    instance_id: Option<String>,
+    /// Sandbox engine ID in security context
     #[arg(long, env = "WLSCTX_SANDBOX_ENGINE")]
     sandbox_engine: String,
-    /// Derive app_id and instance_id from systemd unit name (app-id@instance.service)
-    #[arg(long, env)]
-    systemd_unit: Option<String>,
-    /// Receive socket via systemd socket activation (LISTEN_FDS)
-    #[arg(long, group = "socket", env = "LISTEN_FDS")]
-    socket_activation: bool,
     /// Listen on Unix socket
-    #[arg(long, group = "socket", env = "WLSCTX_SOCKET_PATH")]
+    #[arg(long, env = "WLSCTX_SOCKET_PATH", required_unless_present = "socket_activation")]
     listen: Option<path::PathBuf>,
+    /// Receive socket via systemd socket activation (LISTEN_FDS)
+    #[arg(long, env = "LISTEN_FDS")]
+    socket_activation: bool,
 }
 
 struct State;
@@ -76,47 +75,63 @@ fn main() {
     env_logger::init_from_env(env);
     let cli = Cli::parse();
 
-    let listener = match (cli.socket_activation, cli.listen) {
-        (true, None) => match sd_notify::listen_fds().map(|mut fds| fds.next()) {
-            Ok(Some(raw_fd)) => {
-                // SAFETY: sd_notify::listen_fds() unsets the LISTEN_FDS variable so we should be the
+    let sandbox_engine = cli.sandbox_engine;
+    let (app_id, instance_id, listener) = match (cli.socket_activation, cli.listen) {
+        (true, None) => match sd_notify::listen_fds_with_names(true).map(|mut it| it.next()) {
+            Ok(Some((raw_fd, name))) => {
+                info!("Received socket {name} ({raw_fd:#?}) from parent");
+                let (app_id, instance_id) = match (cli.app_id, cli.instance_id) {
+                    (Some(app_id), Some(instance_id)) => (app_id, instance_id),
+                    (app_id, instance_id) => {
+                        match name.trim_end_matches(".socket").split_once('@') {
+                            Some((sd_prefix, sd_instance)) => {
+                                (app_id.unwrap_or_else(|| sd_prefix.to_string()),
+                                 instance_id.unwrap_or_else(|| sd_instance.to_string()))
+                            },
+                            _ => {
+                                panic!("Missing --app-id --instance-id and no LISTEN_FDNAMES= provided")
+                            }
+                        }
+                    }
+                };
+                // SAFETY: sd_notify::listen_fds_with_names(true) unsets the LISTEN_FDS variable so we should be the
                 // only user of this fd
-                info!("Received socket activation environment from parent {raw_fd:#?}");
-                unsafe { UnixListener::from_raw_fd(raw_fd) }
+                let listener = unsafe { UnixListener::from_raw_fd(raw_fd) };
+                (app_id, instance_id, listener)
             }
             _ => {
                 panic!("Failed to get socket FD from activation environment")
             }
         },
-        (false, Some(socket_path)) => {
+        (_, Some(socket_path)) => {
             let socket_abspath = match socket_path.is_absolute() {
                 true => socket_path,
                 false => xdg::BaseDirectories::new()
                     .place_runtime_file(socket_path)
                     .unwrap(),
             };
-            let _ = match fs::metadata(&socket_abspath) {
-                Ok(meta) => {
-                    if meta.file_type().is_socket() {
+            let _ = fs::metadata(&socket_abspath).map(|meta| {
+                    meta.file_type().is_socket().then(|| {
                         info!("Removing old socket {socket_abspath:?}");
                         let _ = fs::remove_file(&socket_abspath)
-                            .inspect_err(|e| error!("Failed to remove existing socket: {e}"));
-                    } else {
+                            .inspect_err(|e| error!("Remove existing socket failed with error {e}. bind() will likely fail."));
+                    }).unwrap_or_else(||{
                         error!("Path already exists and is not a socket {socket_abspath:?}");
-                    }
-                }
-                _ => (),
-            };
-            UnixListener::bind(socket_abspath).expect("Failed to bind to Unix socket")
+                    });
+            });
+            (cli.app_id.unwrap(), cli.instance_id.unwrap(),
+                UnixListener::bind(socket_abspath)
+                .expect("Failed to bind to Unix socket"))
         }
         _ => {
             panic!("No listening socket provided")
         }
     };
-    let _ = match listener.local_addr() {
-        Ok(local_addr) => info!("Listening on {local_addr:?}"),
-        _ => (),
-    };
+    if log_enabled!(Level::Info) {
+        if let Ok(local_addr) = listener.local_addr() {
+            info!("Listening on {local_addr:?}")
+        }
+    }
 
     let close_fd: OwnedFd = {
         // Create a Wayland connection by connecting to the server through the
@@ -130,11 +145,8 @@ fn main() {
         let security_context =
             security_context_manager.create_listener(listener.as_fd(), reader.as_fd(), qh, ());
         security_context_manager.destroy();
-        let sandbox_engine = &cli.sandbox_engine;
-        let app_id = &cli.app_id;
-        let instance_id = &cli.instance_id;
-        info!("Create security context mapping for {app_id} ({instance_id})");
-        security_context.set_sandbox_engine(sandbox_engine.clone());
+        info!("Create security context mapping for {sandbox_engine} app: {app_id} ({instance_id})");
+        security_context.set_sandbox_engine(sandbox_engine);
         security_context.set_app_id(app_id.clone());
         security_context.set_instance_id(instance_id.clone());
         security_context.commit();
@@ -142,13 +154,21 @@ fn main() {
         event_queue.roundtrip(&mut State {}).unwrap();
         writer.into()
     };
-    info!("Holding close_fd open to keep the tagged wayland socket available {close_fd:?}");
+    info!("Holding close_fd open to keep the tagged Wayland socket available {close_fd:?}");
     let _ = sd_notify::notify(true, &[sd_notify::NotifyState::Ready]);
-    let mut mask = SigSet::all();
-    for sig in (SIGFPE | SIGILL | SIGSEGV | SIGBUS | SIGABRT | SIGTRAP | SIGSYS).iter() {
-        mask.remove(sig);
-    }
+
+    // This signal handler is inspired by the implementation in catatonit:
+    // https://github.com/openSUSE/catatonit/blob/56579adbb42c0c7ad94fc12d844b38fc5b37b3ce/catatonit.c#L538-L588
+    //
+    // Block all signals except the ones generated by the kernel if we have a problem in our own program.
+    let mask: SigSet = SigSet::all().iter()
+        .filter(|sig|
+            (SIGFPE | SIGILL | SIGSEGV | SIGBUS | SIGABRT | SIGTRAP | SIGSYS)
+                .contains(*sig).not())
+        .collect();
     mask.thread_block().unwrap();
+
+    // Handle signals synchronously via signalfd(2)
     let sigfd = SignalFd::with_flags(&mask, SfdFlags::SFD_CLOEXEC).unwrap();
     while let Some(siginfo) = sigfd.read_signal().unwrap() {
         debug!("Signal: {siginfo:?}");
@@ -171,9 +191,9 @@ fn main() {
                 debug!("ignoring kernel attempting to stop us: tty has TOSTOP set");
             }
             sig => {
-                warn!("Unexpected signal {sig:#?}");
+                warn!("Unexpected signal ignored ({sig:#?})");
             }
         }
     }
-    info!("Shutting down...");
+    info!("Shutting down.");
 }
