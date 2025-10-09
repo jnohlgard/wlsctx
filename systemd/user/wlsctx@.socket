@@ -4,6 +4,7 @@ PartOf=graphical-session.target
 After=graphical-session.target
 Conflicts=wayland-session-shutdown.target
 Before=wayland-session-shutdown.target
+PropagatesStopTo=%N.service
 
 [Socket]
 RuntimeDirectory=wlsctx/%i
@@ -11,6 +12,8 @@ RuntimeDirectoryPreserve=yes
 RuntimeDirectoryMode=0700
 SocketMode=0600
 ListenStream=%t/wlsctx/%i/wayland-1
+FileDescriptorName=%i
+PassCredentials=yes
 
 [Install]
 WantedBy=%i.target

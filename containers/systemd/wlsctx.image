@@ -1,0 +1,6 @@
+[Image]
+Image=ghcr.io/wlsctx/wlsctx:latest
+Policy=missing
+
+[Quadlet]
+DefaultDependencies=false
