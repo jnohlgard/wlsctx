@@ -1,0 +1,32 @@
+ARG BASE_IMAGE=registry.fedoraproject.org/fedora:43
+FROM ${BASE_IMAGE} AS base
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    xcb-util-renderutil \
+    xcb-util-image \
+    xcb-util-cursor \
+    libxcb \
+    libXau \
+    xcb-util \
+    ;
+
+FROM base AS xwayland-builder
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    git-core \
+    rustup-init \
+    gcc-c++ \
+    xcb-util-cursor-devel \
+    clang-devel \
+  && rustup-init -y --profile minimal
+RUN --mount=type=cache,id=cargo,dst=/root/.cargo/registry/cache \
+  . ~/.cargo/env && \
+  cargo install --git https://github.com/Supreeeme/xwayland-satellite.git
+
+FROM base AS xwayland-install
+
+COPY --from=xwayland-builder /root/.cargo/bin/xwayland-satellite /usr/local/bin/

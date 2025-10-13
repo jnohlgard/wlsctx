@@ -1,0 +1,32 @@
+[Unit]
+Description=Minimal Wayland security context manager
+
+[Service]
+Environment=WLSCTX_SANDBOX_ENGINE=podman
+Environment=WLSCTX_APP_ID=pod
+Environment=WLSCTX_INSTANCE_ID=%i
+# We pass the connected Wayland socket via stdin instead of having to give the wlsctx container any extra privileges or SELinux label.
+# Unfortunately, StandardInput=/StandardOutput= do not support environment variables, so we can't use ${WAYLAND_DISPLAY} here.
+StandardInput=file:%t/wayland-1
+StandardOutput=file:%t/wayland-1
+StandardError=journal
+
+[Container]
+LogDriver=passthrough
+Environment=WAYLAND_SOCKET=0
+Exec=--listen=${POD_RUNTIME_DIR}/${WAYLAND_DISPLAY}
+Image=wlsctx.image
+Pull=never
+Environment=WLSCTX_SANDBOX_ENGINE=${WLSCTX_SANDBOX_ENGINE}
+Environment=WLSCTX_APP_ID=${WLSCTX_APP_ID}
+Environment=WLSCTX_INSTANCE_ID=${WLSCTX_INSTANCE_ID}
+Environment=RUST_LOG=info
+Network=none
+Notify=true
+NoNewPrivileges=true
+DropCapability=ALL
+Memory=128m
+User=%U
+Group=%G
+WorkingDir=/
+ContainerName=wl-display_%i

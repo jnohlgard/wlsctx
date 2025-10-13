@@ -1,0 +1,35 @@
+[Unit]
+Description=Filtered D-Bus sockets
+
+[Container]
+Image=localhost/xdg-dbus-proxy:latest
+Pull=never
+RunInit=true
+Exec=xdg-dbus-proxy \
+  unix:path=/run/host/session-bus \
+  ${POD_RUNTIME_DIR}/session-bus-proxy \
+  --filter \
+  --call='org.freedesktop.portal.*=*' \
+  --broadcast='org.freedesktop.portal.*=@/org/freedesktop/portal/*' \
+  --own=io.gitlab.librewolf.'*' \
+  unix:path=/run/host/at-spi-bus \
+  ${POD_RUNTIME_DIR}/at-spi-bus-proxy \
+  --filter \
+  --sloppy-names
+#  --broadcast=org.a11y.atspi.Registry.EventListenerRegistered=@/org/a11y/atspi/registry \
+#  --broadcast=org.a11y.atspi.Registry.EventListenerDeregistered=@/org/a11y/atspi/registry \
+#  --call=org.a11y.atspi.Registry=org.a11y.atspi.Socket.Embed@/org/a11y/atspi/accessible/root \
+#  --call=org.a11y.atspi.Registry=org.a11y.atspi.Socket.Unembed@/org/a11y/atspi/accessible/root \
+#  --call=org.a11y.atspi.Registry=org.a11y.atspi.Registry.GetRegisteredEvents@/org/a11y/atspi/registry \
+#  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.GetKeystrokeListeners@/org/a11y/atspi/registry/deviceeventcontroller \
+#  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.GetDeviceEventListeners@/org/a11y/atspi/registry/deviceeventcontroller \
+#  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.NotifyListenersSync@/org/a11y/atspi/registry/deviceeventcontroller \
+#  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.NotifyListenersAsync@/org/a11y/atspi/registry/deviceeventcontroller \
+#  --filter \
+#  --call='io.gitlab.librewolf.Sandboxed.*=org.a11y.atspi.Socket.Embedded'
+
+#Volume=/run/dbus/system_bus_socket:/run/host/system-bus:ro
+Volume=%t/bus:/run/host/session-bus:ro
+Volume=%t/at-spi/bus:/run/host/at-spi-bus:ro
+SecurityLabelType=wl_dbus_proxy.process
+ContainerName=wl-dbus_%i

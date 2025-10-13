@@ -71,21 +71,6 @@ RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
     crun \
     ;
 
-FROM base AS xwayland-builder
-RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
-  set -eufx; \
-  dnf install -y --setopt=install_weak_deps=false \
-    --setopt=keepcache=true \
-    git-core \
-    rustup-init \
-    gcc-c++ \
-    xcb-util-cursor-devel \
-    clang-devel \
-  && rustup-init -y --profile minimal
-RUN --mount=type=cache,id=cargo,dst=/root/.cargo/registry/cache \
-  . ~/.cargo/env && \
-  cargo install --git https://github.com/Supreeeme/xwayland-satellite.git
-
 FROM base AS wayland-base
 RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
   set -eufx; \
@@ -149,5 +134,3 @@ RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
     mpv \
     xcb-util \
     ;
-
-COPY --from=xwayland-builder /root/.cargo/bin/xwayland-satellite /usr/local/bin/

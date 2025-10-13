@@ -1,0 +1,3 @@
+[Image]
+Image=localhost/librewolf:latest
+Policy=never
