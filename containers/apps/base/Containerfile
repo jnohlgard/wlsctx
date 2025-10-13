@@ -1,0 +1,153 @@
+ARG BASE_IMAGE=registry.fedoraproject.org/fedora:43
+FROM ${BASE_IMAGE} AS base
+
+FROM base AS shell-base
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    dnf-plugins-core \
+    fish \
+    git \
+    vim \
+    acl \
+    attr \
+    util-linux \
+    gcc-c++ \
+    clang \
+    llvm \
+    llvm-devel \
+    clang-devel \
+    git-lfs \
+    git-credential-oauth \
+    git-credential-libsecret \
+    zstd \
+    unzip \
+    tar \
+    bzip2 \
+    curl \
+    wget \
+    xz \
+    sqlite \
+    openssh-clients \
+    erofs-utils \
+    squashfs-tools \
+    squashfs-tools-ng \
+    coreutils \
+    diffutils \
+    findutils \
+    procps-ng \
+    iputils \
+    iproute \
+    moreutils \
+    less \
+    which \
+    bash \
+    patch \
+    e2fsprogs \
+    xfsprogs \
+    perl \
+    python3 \
+    python3-setuptools \
+    python3-pip \
+    python3-pyyaml \
+    yq \
+    jq \
+    ripgrep \
+    nmap \
+    socat \
+    nmap-ncat \
+    docker-cli \
+    docker-compose \
+    docker-buildx \
+    distribution-gpg-keys \
+    pciutils \
+    usbutils \
+    fuse3  \
+    fuse-overlayfs \
+    podman \
+    buildah \
+    skopeo \
+    crun \
+    ;
+
+FROM base AS xwayland-builder
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    git-core \
+    rustup-init \
+    gcc-c++ \
+    xcb-util-cursor-devel \
+    clang-devel \
+  && rustup-init -y --profile minimal
+RUN --mount=type=cache,id=cargo,dst=/root/.cargo/registry/cache \
+  . ~/.cargo/env && \
+  cargo install --git https://github.com/Supreeeme/xwayland-satellite.git
+
+FROM base AS wayland-base
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  releasever=$(dnf --dump-variables | grep -e '^releasever =' | cut -d' ' -f 3-) && \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    dnf-plugins-core \
+    "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${releasever}.noarch.rpm" \
+    "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-${releasever}.noarch.rpm"
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    mesa-dri-drivers \
+    mesa-vulkan-drivers-freeworld \
+    mesa-va-drivers-freeworld \
+    mesa-vdpau-drivers-freeworld \
+    libavcodec-freeworld \
+    libdrm \
+    libwayland-client \
+    libwayland-server \
+    libwayland-cursor \
+    libwayland-egl \
+    qt6-qtwayland \
+    libinput \
+    thunar \
+    libglvnd \
+    libarchive \
+    ffmpeg \
+    libva \
+    libvdpau \
+    default-fonts-core \
+    jetbrains-mono-fonts-all \
+    foot \
+    kitty \
+    wayland-utils \
+    libva-utils \
+    vulkan-tools \
+    egl-utils \
+    intel-media-driver \
+    intel-mediasdk \
+    gnome-themes-extra \
+    adwaita-fonts-all \
+    pipewire \
+    pipewire-pulseaudio \
+    pipewire-alsa \
+    intel-vpl-gpu-rt \
+    libheif-freeworld \
+    wireplumber \
+    vulkan-loader \
+    pipewire-plugin-libcamera \
+    pipewire-plugin-vulkan \
+    pipewire-v4l2 \
+    pipewire-utils \
+    opus \
+    libvorbis \
+    flac-libs \
+    vulkan-tools \
+    egl-utils \
+    drm_info \
+    mpv \
+    xcb-util \
+    ;
+
+COPY --from=xwayland-builder /root/.cargo/bin/xwayland-satellite /usr/local/bin/

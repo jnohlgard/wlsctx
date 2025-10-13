@@ -1,0 +1,4 @@
+[Build]
+ImageTag=localhost/librewolf:latest
+Pull=missing
+File=librewolf.docker
