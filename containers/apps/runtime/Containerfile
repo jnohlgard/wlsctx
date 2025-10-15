@@ -1,49 +1,71 @@
-ARG BASE_IMAGE=registry.fedoraproject.org/fedora:43
-FROM ${BASE_IMAGE} AS base
-
-FROM base AS shell-base
+FROM fedora AS base
 RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
   set -eufx; \
   dnf install -y --setopt=install_weak_deps=false \
     --setopt=keepcache=true \
     dnf-plugins-core \
-    fish \
-    git \
-    vim \
+    coreutils \
+    less \
+    which \
+    findutils \
+    procps-ng \
+    diffutils \
+    patch \
+    iputils \
+    iproute \
+    bash \
     acl \
     attr \
     util-linux \
-    gcc-c++ \
-    clang \
-    llvm \
-    llvm-devel \
-    clang-devel \
-    git-lfs \
-    git-credential-oauth \
-    git-credential-libsecret \
     zstd \
     unzip \
     tar \
     bzip2 \
+    xz \
     curl \
     wget \
-    xz \
     sqlite \
+    openssl \
+    nss \
+    ca-certificates \
+    git-core \
+    libfido2 \
+    libbpf \
+    qrencode-libs \
+    pciutils \
+    usbutils \
+    fuse3 \
+    fuse-overlayfs \
+    fuse3-libs \
+    jq \
+    yq \
+    javapackages-filesystem \
+    tzdata-java \
+    lksctp-tools \
+    xml-common \
+    ;
+
+
+FROM base AS shell-runtime
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    fish \
+    git \
+    vim \
+    vim-default-editor \
+    xxd \
+    file \
+    tree \
+    qrencode \
+    git-lfs \
+    git-credential-oauth \
+    git-credential-libsecret \
     openssh-clients \
     erofs-utils \
     squashfs-tools \
     squashfs-tools-ng \
-    coreutils \
-    diffutils \
-    findutils \
-    procps-ng \
-    iputils \
-    iproute \
-    moreutils \
-    less \
-    which \
-    bash \
-    patch \
     e2fsprogs \
     xfsprogs \
     perl \
@@ -52,26 +74,49 @@ RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
     python3-pip \
     python3-pyyaml \
     yq \
-    jq \
     ripgrep \
-    nmap \
     socat \
     nmap-ncat \
+    nmap \
     docker-cli \
     docker-compose \
     docker-buildx \
     distribution-gpg-keys \
-    pciutils \
-    usbutils \
-    fuse3  \
-    fuse-overlayfs \
     podman \
     buildah \
     skopeo \
     crun \
     ;
 
-FROM base AS wayland-base
+FROM shell-runtime AS shell-devel
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    moreutils \
+    gcc-c++ \
+    meson \
+    ninja-build \
+    make \
+    binutils \
+    binutils-aarch64-linux-gnu \
+    binutils-riscv64-linux-gnu \
+    binutils-x86_64-linux-gnu \
+    clang \
+    llvm \
+    llvm-devel \
+    clang-devel \
+    ;
+
+FROM shell-runtime AS java-headless-runtime
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    jre-headless \
+    ;
+
+FROM base AS wayland-runtime
 RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
   set -eufx; \
   releasever=$(dnf --dump-variables | grep -e '^releasever =' | cut -d' ' -f 3-) && \
@@ -88,6 +133,8 @@ RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
     mesa-vulkan-drivers-freeworld \
     mesa-va-drivers-freeworld \
     mesa-vdpau-drivers-freeworld \
+    ttmkfdir \
+    mkfontscale \
     libavcodec-freeworld \
     libdrm \
     libwayland-client \
@@ -99,6 +146,7 @@ RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
     thunar \
     libglvnd \
     libarchive \
+    libpng \
     ffmpeg \
     libva \
     libvdpau \
@@ -133,4 +181,23 @@ RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
     drm_info \
     mpv \
     xcb-util \
+    fuse3  \
+    fuse-overlayfs \
+    xorg-x11-server-Xwayland \
+    xorg-x11-xauth \
+    xorg-x11-xinit \
+    dbus-x11 \
+    setxkbmap \
+    qt5-qtx11extras \
     ;
+
+FROM wayland-runtime AS java-wayland-runtime
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    jre \
+    ;
+
+FROM scratch AS err-choose-a-target
+RUN "ERROR: You need to choose a build target"

@@ -1,0 +1,3 @@
+[Image]
+Image=localhost/ext-rustrover:latest
+Policy=never

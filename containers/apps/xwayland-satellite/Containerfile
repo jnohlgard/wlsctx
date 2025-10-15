@@ -1,5 +1,4 @@
-ARG BASE_IMAGE=registry.fedoraproject.org/fedora:43
-FROM ${BASE_IMAGE} AS base
+FROM runtime AS base
 RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
   set -eufx; \
   dnf install -y --setopt=install_weak_deps=false \
@@ -10,6 +9,7 @@ RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
     libxcb \
     libXau \
     xcb-util \
+    xorg-x11-server-Xwayland \
     ;
 
 FROM base AS xwayland-builder

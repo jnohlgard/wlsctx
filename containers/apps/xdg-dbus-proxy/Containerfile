@@ -1,4 +1,2 @@
-ARG BASE_IMAGE=docker.io/library/alpine:latest
-FROM ${BASE_IMAGE} AS base
-FROM base AS app
+FROM alpine AS app
 RUN apk add --no-cache xdg-dbus-proxy

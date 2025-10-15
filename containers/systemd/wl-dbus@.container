@@ -1,10 +1,16 @@
 [Unit]
 Description=Filtered D-Bus sockets
+StopWhenUnneeded=yes
 
 [Container]
 Image=localhost/xdg-dbus-proxy:latest
 Pull=never
 RunInit=true
+Network=none
+#Volume=/run/dbus/system_bus_socket:/run/host/system-bus:ro
+Volume=%t/bus:/run/host/session-bus:ro
+Volume=%t/at-spi/bus_0:/run/host/at-spi-bus:ro
+SecurityLabelType=wl_dbus_proxy.process
 Exec=xdg-dbus-proxy \
   unix:path=/run/host/session-bus \
   ${POD_RUNTIME_DIR}/session-bus-proxy \
@@ -27,9 +33,3 @@ Exec=xdg-dbus-proxy \
 #  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.NotifyListenersAsync@/org/a11y/atspi/registry/deviceeventcontroller \
 #  --filter \
 #  --call='io.gitlab.librewolf.Sandboxed.*=org.a11y.atspi.Socket.Embedded'
-
-#Volume=/run/dbus/system_bus_socket:/run/host/system-bus:ro
-Volume=%t/bus:/run/host/session-bus:ro
-Volume=%t/at-spi/bus:/run/host/at-spi-bus:ro
-SecurityLabelType=wl_dbus_proxy.process
-ContainerName=wl-dbus_%i

@@ -1,5 +1,6 @@
 [Unit]
 Description=Minimal Wayland security context manager
+StopWhenUnneeded=yes
 
 [Service]
 Environment=WLSCTX_SANDBOX_ENGINE=podman
@@ -29,4 +30,3 @@ Memory=128m
 User=%U
 Group=%G
 WorkingDir=/
-ContainerName=wl-display_%i

@@ -1,9 +1,0 @@
-[Unit]
-Description=Sandboxed Xwayland satellite
-
-[Container]
-Exec=xwayland-satellite
-Image=xwayland-satellite.image
-Pull=never
-ServiceName=app-podman-xwayland@
-Network=none

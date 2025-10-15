@@ -8,6 +8,7 @@ Before=wayland-session-shutdown.target
 
 [Service]
 Environment=POD_RUNTIME_DIR=/run/pod
+ExecStopPost=podman volume rm "%p_%i_run-${INVOCATION_ID}"
 
 [Pod]
 PodName=%p_%i

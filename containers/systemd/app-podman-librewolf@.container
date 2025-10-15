@@ -2,7 +2,6 @@
 Description=Sandboxed Librewolf
 
 [Container]
-ContainerName=wl-app-%j_%i
 Exec=librewolf
 Image=librewolf.image
 Pull=never
@@ -11,6 +10,5 @@ AddDevice=-/dev/dri/renderD129
 AddDevice=-/dev/dri/renderD130
 AddDevice=-/dev/dri/renderD131
 
-ServiceName=app-podman-librewolf@
 AddCapability=SYS_CHROOT
 Unmask=/sys/fs/cgroup
