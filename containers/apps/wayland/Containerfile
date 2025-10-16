@@ -1,0 +1,81 @@
+FROM base AS runtime
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  releasever=$(dnf --dump-variables | grep -e '^releasever =' | cut -d' ' -f 3-) && \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    dnf-plugins-core \
+    "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${releasever}.noarch.rpm" \
+    "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-${releasever}.noarch.rpm"
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    mesa-dri-drivers \
+    mesa-vulkan-drivers-freeworld \
+    mesa-va-drivers-freeworld \
+    mesa-vdpau-drivers-freeworld \
+    ttmkfdir \
+    mkfontscale \
+    libavcodec-freeworld \
+    libdrm \
+    libwayland-client \
+    libwayland-server \
+    libwayland-cursor \
+    libwayland-egl \
+    qt6-qtwayland \
+    libinput \
+    thunar \
+    libglvnd \
+    libarchive \
+    libpng \
+    ffmpeg \
+    libva \
+    libvdpau \
+    default-fonts-core \
+    jetbrains-mono-fonts-all \
+    foot \
+    kitty \
+    wayland-utils \
+    libva-utils \
+    vulkan-tools \
+    egl-utils \
+    intel-media-driver \
+    intel-mediasdk \
+    gnome-themes-extra \
+    adwaita-fonts-all \
+    pipewire \
+    pipewire-pulseaudio \
+    pipewire-alsa \
+    intel-vpl-gpu-rt \
+    libheif-freeworld \
+    wireplumber \
+    vulkan-loader \
+    pipewire-plugin-libcamera \
+    pipewire-plugin-vulkan \
+    pipewire-v4l2 \
+    pipewire-utils \
+    opus \
+    libvorbis \
+    flac-libs \
+    vulkan-tools \
+    egl-utils \
+    drm_info \
+    mpv \
+    xcb-util \
+    fuse3  \
+    fuse-overlayfs \
+    xorg-x11-server-Xwayland \
+    xorg-x11-xauth \
+    xorg-x11-xinit \
+    dbus-x11 \
+    setxkbmap \
+    qt5-qtx11extras \
+    xcb-util-renderutil \
+    xcb-util-image \
+    xcb-util-cursor \
+    libxcb \
+    libXau \
+    xcb-util \
+    xhost \
+    ;

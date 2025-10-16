@@ -1,0 +1,46 @@
+FROM fedora AS base
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    dnf-plugins-core \
+    coreutils \
+    less \
+    which \
+    findutils \
+    procps-ng \
+    diffutils \
+    patch \
+    iputils \
+    iproute \
+    bash \
+    acl \
+    attr \
+    util-linux \
+    zstd \
+    unzip \
+    tar \
+    bzip2 \
+    xz \
+    curl \
+    wget \
+    sqlite \
+    openssl \
+    nss \
+    ca-certificates \
+    git-core \
+    libfido2 \
+    libbpf \
+    qrencode-libs \
+    pciutils \
+    usbutils \
+    fuse3 \
+    fuse-overlayfs \
+    fuse3-libs \
+    jq \
+    yq \
+    javapackages-filesystem \
+    tzdata-java \
+    lksctp-tools \
+    xml-common \
+    ;

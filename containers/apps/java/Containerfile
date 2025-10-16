@@ -1,0 +1,15 @@
+FROM base AS headless-runtime
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    jre-headless \
+    ;
+
+FROM base AS runtime
+RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
+  set -eufx; \
+  dnf install -y --setopt=install_weak_deps=false \
+    --setopt=keepcache=true \
+    jre \
+    ;

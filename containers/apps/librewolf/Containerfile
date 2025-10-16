@@ -1,4 +1,4 @@
-FROM runtime AS app
+FROM base AS app
 #ADD https://repo.librewolf.net/librewolf.repo /etc/yum.repos.d/librewolf.repo
 COPY <<-EOT /etc/yum.repos.d/librewolf.repo
 	[repository]

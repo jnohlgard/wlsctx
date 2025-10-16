@@ -36,30 +36,41 @@ group "default" {
 
 target "_runtime_common" {
   dockerfile = "Containerfile"
-  context = "apps/runtime"
   contexts = {
     fedora = "docker-image://registry.fedoraproject.org/fedora:${DISTRO_RELEASE}"
   }
 }
 
+target "base" {
+  inherits = ["_runtime_common"]
+  context = "apps/base"
+}
+
 target "runtime" {
   inherits = ["_runtime_common"]
+  context = "containers/apps/${tgt}"
+  contexts = {
+    base = "target:base"
+  }
   matrix = {
-    tgt = ["shell", "wayland", "java-wayland", "java-headless"]
+    tgt = ["shell", "wayland", "java"]
   }
   name = "${tgt}-runtime"
-  target = "${tgt}-runtime"
+  target = "runtime"
   tags = tags("${tgt}-runtime")
 }
 
-
 target "devel" {
   inherits = ["_runtime_common"]
+  context = "containers/apps/${tgt}"
+  contexts = {
+    base = "target:${tgt}-runtime"
+  }
   matrix = {
-    tgt = ["shell"]
+    tgt = ["shell", "wayland"]
   }
   name = "${tgt}-devel"
-  target = "${tgt}-devel"
+  target = "devel"
   tags = tags("${tgt}-devel")
 }
 

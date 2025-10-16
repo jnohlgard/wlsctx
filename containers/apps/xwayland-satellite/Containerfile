@@ -3,13 +3,6 @@ RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
   set -eufx; \
   dnf install -y --setopt=install_weak_deps=false \
     --setopt=keepcache=true \
-    xcb-util-renderutil \
-    xcb-util-image \
-    xcb-util-cursor \
-    libxcb \
-    libXau \
-    xcb-util \
-    xorg-x11-server-Xwayland \
     ;
 
 FROM base AS xwayland-builder
