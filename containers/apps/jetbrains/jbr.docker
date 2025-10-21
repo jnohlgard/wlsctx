@@ -19,11 +19,14 @@ RUN --mount=type=cache,id=download-jb,dst=/download \
   elif [ ${TARGETARCH} == amd64 ]; then jbr_arch=x64; \
   else exit 2; \
   fi; \
-  image_url='https://github.com/JetBrains/JetBrainsRuntime' && \
-  release_url=$(curl -w '%{redirect_url}' -o /dev/null -f \
-    "${image_url}/releases/latest") && \
-  release_tag=${release_url##*/} && \
+  gh_repo=JetBrains/JetBrainsRuntime && \
+  curl -H "Accept: application/vnd.github+json" -Lf -o release.json \
+    "https://api.github.com/repos/${gh_repo}/releases/latest" && \
+  image_url="https://github.com/${gh_repo}" && \
+  release_url=$(jq -j '.html_url' release.json) && \
+  release_tag=$(jq -j '.tag_name' release.json) && \
   release_version=${release_tag#jbr-release-} && \
+  release_date=$(jq -j '.published_at // .updated_at' release.json) && \
   java_version=${release_version%%b*} && \
   jbr_build=${release_version#*b} && \
   archive_file="jbr_jcef-${java_version}-${TARGETOS}-${jbr_arch}-b${jbr_build}.tar.gz" && \
@@ -53,13 +56,15 @@ RUN --mount=type=cache,id=download-jb,dst=/download \
   umoci repack --image "out:${image_ref}" \
     --history.comment="Import release archive ${archive_file}" \
     --history.created_by="ADD $(cat "/download/${sha512_file}")" \
+    --history.created="${release_date}" \
     "work" && \
   umoci config --image "out:${image_ref}" \
     --architecture="${TARGETARCH}" \
     --os="${TARGETOS}" \
+    --created="${release_date}" \
     --config.label="org.opencontainers.image.title=${image_title}" \
     --config.label="org.opencontainers.image.version=${impl_version}" \
-    --config.label="org.opencontainers.image.revision=${release_tag}" \
+    --config.label="org.opencontainers.image.revision=${jbr_source}" \
     --manifest.annotation="org.opencontainers.image.title=${image_title}" \
     --manifest.annotation="org.opencontainers.image.description=Runtime environment based on OpenJDK for running IntelliJ Platform-based products" \
     --manifest.annotation="org.opencontainers.image.version=${impl_version}" \
@@ -68,9 +73,9 @@ RUN --mount=type=cache,id=download-jb,dst=/download \
     --manifest.annotation="org.opencontainers.image.source=${release_url}" \
     --manifest.annotation="org.opencontainers.image.vendor=${implementor}" \
     --manifest.annotation="org.opencontainers.image.licenses=LicenseRef-proprietary" \
+    --manifest.annotation="org.opencontainers.image.created=${release_date}" \
     --no-history && \
   umoci gc --layout out
 
 FROM scratch AS extension
-LABEL org.opencontainers.image.title="JetBrains Runtime"
 COPY --from=download /work/out/ /jbr.oci
