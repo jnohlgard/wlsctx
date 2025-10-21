@@ -1,0 +1,76 @@
+FROM alpine AS tools
+RUN apk add --no-cache umoci gzip jq curl skopeo
+COPY --chmod=0755 <<-'EOT' /bin/read-var
+	#!/bin/sh
+	set -euf
+	set -x
+	test "$#" -ge 1
+	varname=$1;shift
+	grep -e "^${varname}=" "$@" | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'
+EOT
+
+FROM tools AS download
+ARG TARGETARCH
+ARG TARGETOS
+WORKDIR /work
+RUN --mount=type=cache,id=download-jb,dst=/download \
+  set -eufx; \
+  if [ ${TARGETARCH} == arm64 ]; then jbr_arch=aarch64; \
+  elif [ ${TARGETARCH} == amd64 ]; then jbr_arch=x64; \
+  else exit 2; \
+  fi; \
+  image_url='https://github.com/JetBrains/JetBrainsRuntime' && \
+  release_url=$(curl -w '%{redirect_url}' -o /dev/null -f \
+    "${image_url}/releases/latest") && \
+  release_tag=${release_url##*/} && \
+  release_version=${release_tag#jbr-release-} && \
+  java_version=${release_version%%b*} && \
+  jbr_build=${release_version#*b} && \
+  archive_file="jbr_jcef-${java_version}-${TARGETOS}-${jbr_arch}-b${jbr_build}.tar.gz" && \
+  sha512_file="${archive_file}.sha512" && \
+  jbr_url="https://cache-redirector.jetbrains.com/intellij-jbr/${archive_file}" && \
+  if [ -f "/download/${sha512_file}" ] && \
+    [ -f "/download/${archive_file}" ] && \
+    sed -n -e "s/^\([A-Fa-f0-9]*\) .${archive_file}\$/\1 *\/download\/${archive_file}/p" "/download/${sha512_file}" | sha512sum -c; then \
+    printf 'Already downloaded: %s\n' "${archive_file}"; \
+  else \
+    curl --retry 5 --remove-on-error --parallel -Lf \
+      -o "${archive_file}" --url "${jbr_url}" \
+      -o "${sha512_file}" --url "${jbr_url}.checksum" && \
+    grep -o -e "^[A-Fa-f0-9]* .${archive_file}\$" "./${sha512_file}" | sha512sum -c && \
+    mv -t "/download/" "./${archive_file}" "./${sha512_file}"; \
+  fi; \
+  image_ref="jbr:${release_tag}" && \
+  image_title='JetBrains Runtime' && \
+  umoci init --layout "out" && \
+  umoci new --image "out:${image_ref}" && \
+  umoci unpack --image "out:${image_ref}" "work" && \
+  mkdir -p "work/rootfs/jbr" && \
+  tar --strip-components=1 -xf "/download/${archive_file}" -C "work/rootfs/jbr" && \
+  impl_version=$(read-var 'IMPLEMENTOR_VERSION' "work/rootfs/jbr/release") && \
+  jbr_source=$(read-var 'SOURCE' "work/rootfs/jbr/release") && \
+  implementor=$(read-var 'IMPLEMENTOR' "work/rootfs/jbr/release") && \
+  umoci repack --image "out:${image_ref}" \
+    --history.comment="Import release archive ${archive_file}" \
+    --history.created_by="ADD $(cat "/download/${sha512_file}")" \
+    "work" && \
+  umoci config --image "out:${image_ref}" \
+    --architecture="${TARGETARCH}" \
+    --os="${TARGETOS}" \
+    --config.label="org.opencontainers.image.title=${image_title}" \
+    --config.label="org.opencontainers.image.version=${impl_version}" \
+    --config.label="org.opencontainers.image.revision=${release_tag}" \
+    --manifest.annotation="org.opencontainers.image.title=${image_title}" \
+    --manifest.annotation="org.opencontainers.image.description=Runtime environment based on OpenJDK for running IntelliJ Platform-based products" \
+    --manifest.annotation="org.opencontainers.image.version=${impl_version}" \
+    --manifest.annotation="org.opencontainers.image.revision=${jbr_source}" \
+    --manifest.annotation="org.opencontainers.image.url=${image_url}" \
+    --manifest.annotation="org.opencontainers.image.source=${release_url}" \
+    --manifest.annotation="org.opencontainers.image.vendor=${implementor}" \
+    --manifest.annotation="org.opencontainers.image.licenses=LicenseRef-proprietary" \
+    --no-history && \
+  umoci gc --layout out
+
+FROM scratch AS extension
+LABEL org.opencontainers.image.title="JetBrains Runtime"
+COPY --from=download /work/out/ /jbr.oci

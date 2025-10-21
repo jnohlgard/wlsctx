@@ -1,0 +1,100 @@
+ARG JB_PRODUCTS_URL=https://data.services.jetbrains.com/products
+ARG JB_RELEASE_TYPE=release
+ARG JB_CODE
+
+FROM scratch AS jb-product-desc
+ARG JB_PRODUCTS_URL
+ADD "${JB_PRODUCTS_URL}?fields=code,intellijProductCode,alternativeCodes,salesCode,name,productFamilyName,link,description,tags,types,categories,distributions" /products.json
+
+FROM scratch AS jb-latest-release
+ARG JB_PRODUCTS_URL
+ARG JB_CODE
+ARG JB_RELEASE_TYPE
+ADD "${JB_PRODUCTS_URL}/releases?code=${JB_CODE}&type=${JB_RELEASE_TYPE}&latest=true" /releases.json
+
+FROM alpine AS tools
+RUN apk add --no-cache umoci gzip jq curl skopeo
+
+FROM tools AS download
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETPLATFORM
+ARG JB_CODE
+WORKDIR /work
+COPY --from=jb-product-desc /products.json /products.json
+COPY --from=jb-latest-release /releases.json /releases.json
+RUN set -eufx; \
+  [ "${TARGETARCH}" == "arm64" ] && \
+    plat="${TARGETOS}ARM64" || plat="${TARGETOS}"; \
+  jq --arg code "${JB_CODE}" \
+    '.[] | select(.code == $code)' /products.json > product.json && \
+  jq --arg code "${JB_CODE}" --arg plat "${plat}" \
+    '.[$code] | first(.[] | select(.downloads?[$plat]?.link?))' /releases.json > release.json
+RUN jq '.' product.json
+RUN --mount=type=cache,id=download-jb,dst=/download \
+  set -eufx; \
+  [ "${TARGETARCH}" == "arm64" ] && \
+    plat="${TARGETOS}ARM64" || plat="${TARGETOS}"; \
+  image_url=$(jq -j '.link' product.json); \
+  jq -j '.description' product.json > description.txt; \
+  release_revision=$(jq -j '.build' release.json); \
+  archive_url=$(jq -j --arg plat "${plat}" \
+    '.downloads[$plat].link' release.json) && \
+  archive_file=${archive_url##*/} && \
+  [ -n "${archive_file}" ]; \
+  sha256_url=$(jq -j --arg plat "${plat}" \
+    '.downloads[$plat].checksumLink' release.json) && \
+  sha256_file=${sha256_url##*/} && \
+  [ -n "${sha256_file}" ]; \
+  if [ -f "/download/${sha256_file}" ] && \
+    [ -f "/download/${archive_file}" ] && \
+    sed -n -e "s/^\([A-Fa-f0-9]*\) .${archive_file}\$/\1 *\/download\/${archive_file}/p" "/download/${sha256_file}" | sha256sum -c; then \
+    printf 'Already downloaded: %s\n' "${archive_file}"; \
+  else \
+    curl --retry 5 --remove-on-error --parallel -Lf \
+      -o "${sha256_file}" --url "${sha256_url}" \
+      -o "${archive_file}" --url "${archive_url}" && \
+    grep -o -e "^[A-Fa-f0-9]* .${archive_file}\$" "./${sha256_file}" | sha256sum -c && \
+    mv -t "/download/" "./${archive_file}" "./${sha256_file}"; \
+  fi; \
+  image_title=$(jq -j '.name' product.json) && \
+  image_name=$(printf '%s' "${image_title}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9+@-' '-') && \
+  [ -n "${image_name}" ]; \
+  image_tag=$(jq -j 'if .type == "release" then .version else "\(.build)-\(.type)" end' release.json) && \
+  image_ref="${image_name}:${image_tag}" && \
+  umoci init --layout "out" && \
+  umoci new --image "out:${image_ref}" && \
+  umoci unpack --image "out:${image_ref}" "work" && \
+  mkdir -p "work/rootfs/app" && \
+  tar --strip-components=1 -xf "/download/${archive_file}" -C "work/rootfs/app" && \
+  rm -rf "work/rootfs/app/jbr" && \
+  ln -s "../jbr" "work/rootfs/app/jbr" && \
+  launcher_path=$(jq -r '.launch[].launcherPath' 'work/rootfs/app/product-info.json') && \
+  prod=${launcher_path##*/} && \
+  mv "work/rootfs/app" "work/rootfs/${prod}" && \
+  mkdir -p "work/rootfs/bin" && \
+  ln -s "../${launcher_path}" "work/rootfs/bin/" && \
+  umoci repack --image "out:${image_ref}" \
+    --history.comment="Import release archive ${archive_file}" \
+    --history.created_by="ADD $(cat "/download/${sha256_file}")" \
+    "work" && \
+  umoci config --image "out:${image_ref}" \
+    --architecture="${TARGETARCH}" \
+    --os="${TARGETOS}" \
+    --config.label="org.opencontainers.image.title=${image_title}" \
+    --config.label="org.opencontainers.image.version=${image_tag}" \
+    --config.label="org.opencontainers.image.revision=${release_revision}" \
+    --manifest.annotation="org.opencontainers.image.title=${image_title}" \
+    --manifest.annotation="org.opencontainers.image.description=$(cat description.txt)" \
+    --manifest.annotation="org.opencontainers.image.version=${image_tag}" \
+    --manifest.annotation="org.opencontainers.image.revision=${release_revision}" \
+    --manifest.annotation="org.opencontainers.image.url=${image_url}" \
+    --manifest.annotation="org.opencontainers.image.source=${archive_url}" \
+    --manifest.annotation="org.opencontainers.image.vendor=JetBrains" \
+    --manifest.annotation="org.opencontainers.image.licenses=LicenseRef-proprietary" \
+    --no-history && \
+  umoci gc --layout out
+#  : # skopeo copy "oci:out:${image_ref}" "oci-archive:oci-image.tar"
+
+FROM scratch AS extension
+COPY --from=download /work/out/ /app.oci
