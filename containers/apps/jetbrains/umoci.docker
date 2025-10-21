@@ -68,15 +68,22 @@ RUN --mount=type=cache,id=download-jb,dst=/download \
   mkdir -p "work/rootfs/app" && \
   tar --strip-components=1 -xf "/download/${archive_file}" -C "work/rootfs/app" && \
   rm -rf "work/rootfs/app/jbr" && \
+  mkdir -p "work/rootfs/jbr" && \
   ln -s "../jbr" "work/rootfs/app/jbr" && \
   launcher_path=$(jq -r '.launch[].launcherPath' 'work/rootfs/app/product-info.json') && \
-  prod=${launcher_path##*/} && \
-  mv "work/rootfs/app" "work/rootfs/${prod}" && \
+  mv "work/rootfs/app" "work/rootfs/${image_name}" && \
   mkdir -p "work/rootfs/bin" && \
-  ln -s "../${launcher_path}" "work/rootfs/bin/" && \
-  umoci repack --image "out:${image_ref}" \
+  ln -sf "../${image_name}/${launcher_path}" "work/rootfs/bin/${image_name}" && \
+  ln -sf "../${image_name}/${launcher_path}" "work/rootfs/bin/" && \
+  umoci repack --refresh-bundle --image "out:${image_ref}" \
     --history.comment="Import release archive ${archive_file}" \
     --history.created_by="ADD $(cat "/download/${sha256_file}")" \
+    "work" && \
+  sed -i -e '$a-Dawt.toolkit.name=WLToolkit' \
+    "work/rootfs/${image_name}/${launcher_path}64.vmoptions" && \
+  umoci repack --refresh-bundle --image "out:${image_ref}" \
+    --history.comment="Use Wayland by default" \
+    --history.created_by="Patch ${launcher_path}64.vmoptions" \
     "work" && \
   umoci config --image "out:${image_ref}" \
     --architecture="${TARGETARCH}" \

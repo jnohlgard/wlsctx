@@ -48,11 +48,11 @@ RUN --mount=type=cache,id=download-jb,dst=/download \
   umoci init --layout "out" && \
   umoci new --image "out:${image_ref}" && \
   umoci unpack --image "out:${image_ref}" "work" && \
-  mkdir -p "work/rootfs/jbr" && \
-  tar --strip-components=1 -xf "/download/${archive_file}" -C "work/rootfs/jbr" && \
-  impl_version=$(read-var 'IMPLEMENTOR_VERSION' "work/rootfs/jbr/release") && \
-  jbr_source=$(read-var 'SOURCE' "work/rootfs/jbr/release") && \
-  implementor=$(read-var 'IMPLEMENTOR' "work/rootfs/jbr/release") && \
+  mkdir -p "work/rootfs/" && \
+  tar --strip-components=1 -xf "/download/${archive_file}" -C "work/rootfs/" && \
+  impl_version=$(read-var 'IMPLEMENTOR_VERSION' "work/rootfs/release") && \
+  jbr_source=$(read-var 'SOURCE' "work/rootfs/release") && \
+  implementor=$(read-var 'IMPLEMENTOR' "work/rootfs/release") && \
   umoci repack --image "out:${image_ref}" \
     --history.comment="Import release archive ${archive_file}" \
     --history.created_by="ADD $(cat "/download/${sha512_file}")" \
