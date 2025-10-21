@@ -1,0 +1,16 @@
+[Unit]
+Description=SSH agent socket proxy
+StopWhenUnneeded=yes
+ConditionEnvironment=SSH_AUTH_SOCK
+
+[Container]
+StartWithPod=false
+Exec=socat unix-listen:${POD_RUNTIME_DIR}/ssh-agent-proxy,unlink-early,mode=0600,user=%U,group=%G,fork unix-connect:%t/ssh-agent.socket
+Image=localhost/socat:latest
+Pull=never
+RunInit=true
+PodmanArgs=--hostuser=%u
+Volume=${SSH_AUTH_SOCK}:%t/ssh-agent.socket:ro
+Environment=SSH_AUTH_SOCK=%t/ssh-agent.socket
+AddCapability=CHOWN
+SecurityLabelType=ssh_agent_proxy.process
