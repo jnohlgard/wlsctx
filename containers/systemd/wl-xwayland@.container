@@ -5,7 +5,7 @@ Wants=wl-display@.container
 StopWhenUnneeded=yes
 
 [Service]
-ExecStartPost=-podman exec %p_%i xhost SI:localuser:%u
+ExecStartPost=/bin/sh -c 'retries=5; until podman exec %i_%p xhost SI:localuser:%u || [ "$${retries}" -eq 0 ]; do sleep 1; retries=$$((retries - 1)); done'
 
 [Container]
 Exec=xwayland-satellite
