@@ -1,3 +1,4 @@
+ARG JBR_REF=latest
 FROM alpine AS tools
 RUN apk add --no-cache umoci gzip jq curl skopeo
 COPY --chmod=0755 <<-'EOT' /bin/read-var
@@ -10,6 +11,7 @@ COPY --chmod=0755 <<-'EOT' /bin/read-var
 EOT
 
 FROM tools AS download
+ARG JBR_REF
 ARG TARGETARCH
 ARG TARGETOS
 WORKDIR /work
@@ -21,7 +23,7 @@ RUN --mount=type=cache,id=download-jb,dst=/download \
   fi; \
   gh_repo=JetBrains/JetBrainsRuntime && \
   curl -H "Accept: application/vnd.github+json" -Lf -o release.json \
-    "https://api.github.com/repos/${gh_repo}/releases/latest" && \
+    "https://api.github.com/repos/${gh_repo}/releases/${JBR_REF}" && \
   image_url="https://github.com/${gh_repo}" && \
   release_url=$(jq -j '.html_url' release.json) && \
   release_tag=$(jq -j '.tag_name' release.json) && \
