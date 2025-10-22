@@ -1,0 +1,14 @@
+[Unit]
+Description=Wayland pod instance %i runtime volume (/run/pod)
+
+[Volume]
+VolumeName=%i_run-pod-${INVOCATION_ID}
+ServiceName=vol-run-pod@
+Device=tmpfs
+Type=tmpfs
+Copy=false
+User=%U
+Group=%G
+
+[Service]
+ExecStop=-podman volume rm "%i_run-pod-${INVOCATION_ID}"
