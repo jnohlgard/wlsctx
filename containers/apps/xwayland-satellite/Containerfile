@@ -1,11 +1,4 @@
-FROM runtime AS base
-RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
-  set -eufx; \
-  dnf install -y --setopt=install_weak_deps=false \
-    --setopt=keepcache=true \
-    ;
-
-FROM base AS xwayland-builder
+FROM base AS builder
 RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
   set -eufx; \
   dnf install -y --setopt=install_weak_deps=false \
@@ -20,6 +13,6 @@ RUN --mount=type=cache,id=cargo,dst=/root/.cargo/registry/cache \
   . ~/.cargo/env && \
   cargo install --git https://github.com/Supreeeme/xwayland-satellite.git
 
-FROM base AS xwayland-install
+FROM base AS deploy
 
-COPY --from=xwayland-builder /root/.cargo/bin/xwayland-satellite /usr/local/bin/
+COPY --from=builder /root/.cargo/bin/xwayland-satellite /usr/local/bin/
