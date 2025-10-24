@@ -31,31 +31,3 @@ RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
     nmap-ncat \
     ;
 
-FROM runtime AS devel
-RUN --mount=type=cache,id=dnf5-fedora,dst=/var/cache/libdnf5 \
-  set -eufx; \
-  dnf install -y --setopt=install_weak_deps=false \
-    --setopt=keepcache=true \
-    moreutils \
-    gcc-c++ \
-    meson \
-    ninja-build \
-    make \
-    binutils \
-    binutils-aarch64-linux-gnu \
-    binutils-riscv64-linux-gnu \
-    binutils-x86_64-linux-gnu \
-    clang \
-    llvm \
-    llvm-devel \
-    clang-devel \
-    nmap \
-    docker-cli \
-    docker-compose \
-    docker-buildx \
-    distribution-gpg-keys \
-    podman \
-    buildah \
-    skopeo \
-    crun \
-    ;
