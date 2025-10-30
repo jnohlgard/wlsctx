@@ -1,14 +1,13 @@
 [Unit]
-Description=Sandboxed Librewolf
+Description=Sandboxed application %J
+
+[Service]
+Environment=APP_IMAGE_TAG=latest
 
 [Container]
-Exec=librewolf
-Image=librewolf.image
+Image=${RUNTIME_IMAGE}:${RUNTIME_IMAGE_TAG}
 Pull=never
-AddDevice=-/dev/dri/renderD128
-AddDevice=-/dev/dri/renderD129
-AddDevice=-/dev/dri/renderD130
-AddDevice=-/dev/dri/renderD131
-
+Mount="type=image,dst=/app,src=app-%J:${APP_IMAGE_TAG}"
+Exec=/app/bin/%J
 AddCapability=SYS_CHROOT
-Unmask=/sys/fs/cgroup
+

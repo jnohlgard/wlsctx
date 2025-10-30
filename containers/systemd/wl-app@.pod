@@ -12,5 +12,6 @@ Environment=POD_RUNTIME_DIR=/run/pod
 [Pod]
 PodName=wl-app_%i
 Volume=wl-pod-runtime-dir@.volume:${POD_RUNTIME_DIR}:U,Z,nodev,noexec,nosuid
-ServiceName=wl-pod@
+ServiceName=pod-setup@
 PodmanArgs=--pod-id-file=%t/wl-app@%i.pod-id
+#PodmanArgs=--cgroup-parent=%n

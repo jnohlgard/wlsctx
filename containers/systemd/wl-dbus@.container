@@ -4,6 +4,7 @@ StopWhenUnneeded=yes
 
 [Container]
 Image=localhost/xdg-dbus-proxy:latest
+ServiceName=app-pod@
 Pull=never
 RunInit=true
 Network=none
@@ -18,18 +19,20 @@ Exec=xdg-dbus-proxy \
   --call='org.freedesktop.portal.*=*' \
   --broadcast='org.freedesktop.portal.*=@/org/freedesktop/portal/*' \
   --own=io.gitlab.librewolf.'*' \
+  --own=com.belmoussaoui.ashpd.'*' \
+  --log \
   unix:path=/run/host/at-spi-bus \
   ${POD_RUNTIME_DIR}/at-spi-bus-proxy \
   --filter \
   --sloppy-names
-#  --broadcast=org.a11y.atspi.Registry.EventListenerRegistered=@/org/a11y/atspi/registry \
-#  --broadcast=org.a11y.atspi.Registry.EventListenerDeregistered=@/org/a11y/atspi/registry \
-#  --call=org.a11y.atspi.Registry=org.a11y.atspi.Socket.Embed@/org/a11y/atspi/accessible/root \
-#  --call=org.a11y.atspi.Registry=org.a11y.atspi.Socket.Unembed@/org/a11y/atspi/accessible/root \
-#  --call=org.a11y.atspi.Registry=org.a11y.atspi.Registry.GetRegisteredEvents@/org/a11y/atspi/registry \
-#  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.GetKeystrokeListeners@/org/a11y/atspi/registry/deviceeventcontroller \
-#  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.GetDeviceEventListeners@/org/a11y/atspi/registry/deviceeventcontroller \
-#  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.NotifyListenersSync@/org/a11y/atspi/registry/deviceeventcontroller \
-#  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.NotifyListenersAsync@/org/a11y/atspi/registry/deviceeventcontroller \
+  --broadcast=org.a11y.atspi.Registry.EventListenerRegistered=@/org/a11y/atspi/registry \
+  --broadcast=org.a11y.atspi.Registry.EventListenerDeregistered=@/org/a11y/atspi/registry \
+  --call=org.a11y.atspi.Registry=org.a11y.atspi.Socket.Embed@/org/a11y/atspi/accessible/root \
+  --call=org.a11y.atspi.Registry=org.a11y.atspi.Socket.Unembed@/org/a11y/atspi/accessible/root \
+  --call=org.a11y.atspi.Registry=org.a11y.atspi.Registry.GetRegisteredEvents@/org/a11y/atspi/registry \
+  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.GetKeystrokeListeners@/org/a11y/atspi/registry/deviceeventcontroller \
+  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.GetDeviceEventListeners@/org/a11y/atspi/registry/deviceeventcontroller \
+  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.NotifyListenersSync@/org/a11y/atspi/registry/deviceeventcontroller \
+  --call=org.a11y.atspi.Registry=org.a11y.atspi.DeviceEventController.NotifyListenersAsync@/org/a11y/atspi/registry/deviceeventcontroller \
 #  --filter \
 #  --call='io.gitlab.librewolf.Sandboxed.*=org.a11y.atspi.Socket.Embedded'

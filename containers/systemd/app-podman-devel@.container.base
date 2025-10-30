@@ -1,0 +1,11 @@
+[Unit]
+Description=Sandboxed Jetbrains IDE
+Wants=wl-ssh-agent@.container
+After=wl-ssh-agent@.container
+
+[Container]
+Exec=/app/bin/%J
+Image=localhost/devel:latest
+Pull=never
+NoNewPrivileges=false
+Mount=type=image,source=app-%J,destination=/app
