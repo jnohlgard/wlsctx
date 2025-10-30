@@ -4,7 +4,6 @@ StopWhenUnneeded=yes
 
 [Container]
 Image=localhost/xdg-dbus-proxy:latest
-ServiceName=app-pod@
 Pull=never
 RunInit=true
 Network=none
